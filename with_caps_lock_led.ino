@@ -78,7 +78,7 @@ void setup() {
 void loop() {
     // wait until finger is on trackpad
     do {
-        read_trackpad_with_caps_lock();
+        read_trackpad(1);    // 1 means it will check caps lock
         // whilst doing this, apply any scrolling momentum
         if(abs(scroll_vel) > MIN_SCROLL_MOMENTUM){
             ideal_scroll += scroll_vel;
@@ -114,13 +114,13 @@ void loop() {
 
     // ignore first readings to remove initial errors
     for(int i = 0; i<IGNORE_PACKETS_START; i++){
-        read_trackpad();
+        read_trackpad(1);
         check_click();
     }
 
     // add delay of packets so we can ignore the last few packets
     for(int i = 0; i<IGNORE_PACKETS_END; i++){
-        read_trackpad();
+        read_trackpad(1);
         w_queue.enqueue(w);
         x_queue.enqueue(x);
         y_queue.enqueue(y);
@@ -138,7 +138,7 @@ void loop() {
     }
 
     while(z) {
-        read_trackpad();
+        read_trackpad(1);
         check_click();
         if(!(count%CHECK_CAPS_LOCK_FREQUENCY)){
             check_caps_lock();
@@ -390,62 +390,60 @@ uint8_t read_with_caps_lock(void) {
     return d & 0xFF;
 
 }
-void read_trackpad_with_caps_lock(){
+
+void read_trackpad(bool caps_lock){
     // read 6 packets from trackpad
     uint8_t packet[6];
 
-    // this is needed because when it hasnt been used for awhile the trackpad 'sleeps' and wont send packets until
-    // it is touched to 'awake', (note the trackpad is not technically in sleep mode)
-    packet[0] = read_with_caps_lock();
+    if(caps_lock){
+        packet[0] = read_with_caps_lock();
+    }else {
+        packet[0] = read();
+    }
 
-    // only the first read will be blocked, so other can happen as usual
     for (uint8_t x = 1; x < 6; x++) {
         packet[x] = read();
     }
-    // extract values from packets, see fig 3-4 on pg 23 of 'Synaptics PS/2 TouchPad Interfacing Guide' for
-    // packet format
+    // check if an error in packet format
 
-    // num of fingers on touchpad, 4 = 1, 0 = 2, 1 = >2, anything else ignore
-    w = ((packet[0] & 0x30) >> 2) | ((packet[0] & 0x4) >> 1) | ((packet[3] & 0x4) >> 2);
+    // packet 0 should be 10??00xx
+    // normally xx could be anything, but in our case it is always 00 as the buttons do not work
+    if((packet[0] & 0xCB) != 0x80){
+        trackpad_error();
+    // packet 3 should be 11??0?xx
+    // normally xx could be anything, but in our case it is always 00 as the buttons do not work
+    }else if((packet[3] & 0xCB) != 0xC0){
+        trackpad_error();
+    }else{
+        // if we have found no errors
 
-    // preasure of finger
-    z = packet[2];
+        // extract values from packets, see fig 3-4 on pg 23 of 'Synaptics PS/2 TouchPad Interfacing Guide' for
+        // packet format
 
-    // x/y positions
-    x = ((packet[3] & 0x10) << 8) | ((packet[1] & 0xF) << 8) | packet[4];
-    y = ((packet[3] & 0x20) << 7) | ((packet[1] & 0xF0) << 4) | packet[5];
+        // num of fingers on touchpad, 4 = 1, 0 = 2, 1 = >2, anything else ignore
+        w = ((packet[0] & 0x30) >> 2) | ((packet[0] & 0x4) >> 1) | ((packet[3] & 0x4) >> 2);
 
-    // for some reason buttons dont work for me in PS/2 protocol
-    // int button = ((packet[0] & 0x3) << 2) | (packet[3] & 0x3);
-    // get touchpad click from wire soldered to button
-    click = analogRead(CLICK_BUTTON) < 100;
+        // preasure of finger
+        z = packet[2];
+
+        // x/y positions
+        x = ((packet[3] & 0x10) << 8) | ((packet[1] & 0xF) << 8) | packet[4];
+        y = ((packet[3] & 0x20) << 7) | ((packet[1] & 0xF0) << 4) | packet[5];
+
+        // for some reason buttons dont work for me in PS/2 protocol
+        // int button = ((packet[0] & 0x3) << 2) | (packet[3] & 0x3);
+        // get touchpad click from wire soldered to button
+        click = analogRead(CLICK_BUTTON) < 100;
+    }
 }
 
-
-void read_trackpad(){
-    // read 6 packets from trackpad
-    uint8_t packet[6];
-
-    for (uint8_t x = 0; x < 6; x++) {
-        packet[x] = read();
-    }
-    // extract values from packets, see fig 3-4 on pg 23 of 'Synaptics PS/2 TouchPad Interfacing Guide' for
-    // packet format
-
-    // num of fingers on touchpad, 4 = 1, 0 = 2, 1 = >2, anything else ignore
-    w = ((packet[0] & 0x30) >> 2) | ((packet[0] & 0x4) >> 1) | ((packet[3] & 0x4) >> 2);
-
-    // preasure of finger
-    z = packet[2];
-
-    // x/y positions
-    x = ((packet[3] & 0x10) << 8) | ((packet[1] & 0xF) << 8) | packet[4];
-    y = ((packet[3] & 0x20) << 7) | ((packet[1] & 0xF0) << 4) | packet[5];
-
-    // for some reason buttons dont work for me in PS/2 protocol
-    // int button = ((packet[0] & 0x3) << 2) | (packet[3] & 0x3);
-    // get touchpad click from wire soldered to button
-    click = analogRead(CLICK_BUTTON) < 100;
+void trackpad_error(){
+    // wait a bit
+    delay(50);
+    // start by resetting the trackpad
+    enable_touchpad();
+    // and then try to read the trackpad again
+    read_trackpad(0);
 }
 
 
