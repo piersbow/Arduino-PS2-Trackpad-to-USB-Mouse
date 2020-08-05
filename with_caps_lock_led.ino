@@ -18,6 +18,7 @@
 #define TAP_MAX_LENGTH 4
 #define DOUBLE_TAP_MAX_TIME 10
 #define THREE_FINGER_TAP_FOR_MIDDLE_BUTTON 1
+#define IGNORE_SPEEDS_UNDER 0.8
 
 
 // used for acceleration profile, mouse vel = SPEED*dist + ACCEL*(dist^2), where dist is distance finger moved
@@ -185,9 +186,12 @@ void loop() {
             d_y *= dist_accl;
 
             // move mouse
-            ideal_x += d_x;
-            ideal_y += d_y;
-
+            if(abs(d_x) > IGNORE_SPEEDS_UNDER){
+                ideal_x += d_x;
+            }
+            if(abs(d_y) > IGNORE_SPEEDS_UNDER) {
+                ideal_y += d_y;
+            }
             Mouse.move(ideal_x - total_x, ideal_y - total_y);
 
             total_x = ideal_x;
