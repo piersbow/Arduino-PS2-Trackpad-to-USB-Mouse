@@ -32,8 +32,8 @@
 
 
 // used for scrolling behaviour
-#define SCROLL_SPEED -0.018          // negative to reverse direction
-#define SCROLL_MOMENTUM 0.7         // must be < 1, larger means more momentum
+#define SCROLL_SPEED 0.018          // negative to reverse direction
+#define SCROLL_MOMENTUM 0.75         // must be < 1, larger means more momentum
 #define MIN_SCROLL_MOMENTUM 0.005
 
 
@@ -52,6 +52,7 @@ float ideal_scroll = 0;
 // the scrolling function only accepts integers, but sometimes a non integer amount of scroll is specified.
 // this is used to see the different between actual and ideal scrolling, so that it can be compensated for.
 
+
 bool prev_click = 0;
 // used for the physical click so we know if we need to release the button.
 
@@ -66,11 +67,12 @@ void setup() {
     enable_touchpad();
 
     // begin virtual mouse
-
     Mouse.begin();
+
     // begin virtual keyboard for caps lock led
     BootKeyboard.begin();
 }
+
 
 
 
@@ -98,6 +100,12 @@ void loop() {
 
     total_scroll = 0;
     ideal_scroll = 0;
+
+    int total_x = 0;
+    float ideal_x = 0;
+    int total_y = 0;
+    float ideal_y = 0;
+    // used for the same as scrolling, but its less important here
 
     // if finger on pad and we have a previous measurement for position
     // once finger on pad stop any scrolling momentum
@@ -127,7 +135,7 @@ void loop() {
         check_click();
     }
 
-    int prev_x, prev_y, total_x = 0, total_y = 0, count = 0, scrolling = 0;
+    int prev_x, prev_y, count = 0, scrolling = 0;
     // total x/y used for taps, if a tap was triggered and the mouse moved during this, move it back to the initial
     // position before clicking
 
@@ -169,7 +177,6 @@ void loop() {
 
 
         if(w_val == 4 || drag){
-            //Serial.println("move");
             // calc new distance ratio with acceleration
             float dist_accl = SPEED + (ACCEL * sqrt(pow(d_x, 2) + pow(d_y, 2)));
 
@@ -178,11 +185,15 @@ void loop() {
             d_y *= dist_accl;
 
             // move mouse
-            total_x += d_x;
-            total_y += d_y;
-            Mouse.move(d_x, d_y);
+            ideal_x += d_x;
+            ideal_y += d_y;
+
+            Mouse.move(ideal_x - total_x, ideal_y - total_y);
+
+            total_x = ideal_x;
+            total_y = ideal_y;
         }else if(w_val == 0){
-            //Serial.println("scroll");
+
             // once 2 fingers are detected, you become locked into scrolling mode
             scrolling = 1;
 
@@ -319,24 +330,24 @@ void enable_touchpad(){
     write(0xE9);
 
     // read touchpad modes, pg 41
-    send_special(0x01);
-    write(0xE9);
+    //send_special(0x01);
+    //write(0xE9);
 
     // read touchpad capabilities, pg 42
-    send_special(0x02);
-    write(0xE9);
+    //send_special(0x02);
+    //write(0xE9);
 
     // read touchpad extended model id, pg 48
-    send_special(0x09);
-    write(0xE9);
-    read();
+    //send_special(0x09);
+    //write(0xE9);
+    //read();
     //Serial.print("Read extended model id: 0x");
     //print_reads(3);
 
     // read touchpad capabilities continued, pg 48
-    send_special(0x0C);
-    write(0xE9);
-    read();
+    //send_special(0x0C);
+    //write(0xE9);
+    //read();
     //Serial.print("Read touchpad capabilities continued: 0x");
     //print_reads(3);
 
@@ -351,9 +362,9 @@ void enable_touchpad(){
     read();
 
     // read touchpad modes, pg 41
-    send_special(0x01);
-    write(0xE9);
-    read();
+    //send_special(0x01);
+    //write(0xE9);
+    //read();
     //Serial.print("Read touchpad modes:");
     //print_reads(3);
 
